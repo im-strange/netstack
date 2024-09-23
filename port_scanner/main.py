@@ -134,7 +134,7 @@ def main():
 			lines = [
 				f"usage: python {filename} <host> [OPTIONS]",
 				f"\narguments & options:",
-				f"{' '*4}{'host':<15} target host/s",
+				f"{' '*4}{'host [IP_ADDR]':<15} target host/s",
 				f"{' '*4}{'-p, --port':<15} target port/s [default=1-1000]",
 				f"{' '*4}{'-d, --domain':<15} enable domain scanning",
 				f"{' '*4}{'-v, --verbose':<15} print scanning info",
@@ -160,7 +160,12 @@ def main():
 
 	args = parser.parse_args()
 	hosts = args.target.split(",")
-	ports = parse_port(args.port)
+
+	try:
+		ports = parse_port(args.port)
+	except ValueError:
+		print(f"[info] invalid port '{args.port}'")
+		exit(2)
 
 	if args.verbose:
 		display_settings()
