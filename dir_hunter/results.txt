@@ -1,0 +1,6 @@
+http://localhost:5000/greet - 200
+http://localhost:5000/sports - 200
+http://localhost:5000/sports - 200
+http://localhost:5000/greet - 200
+[09-28-2024 12:45:42AM] http://localhost:5000/greet - 200
+[09-28-2024 12:45:42AM] http://localhost:5000/sports - 200

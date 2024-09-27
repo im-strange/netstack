@@ -16,7 +16,7 @@ def path(x):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), x)
 
 
-CONFIG_FILE = "config.ini"
+CONFIG_FILE = "script.conf"
 config = configparser.ConfigParser()
 config.read(CONFIG_FILE)
 
@@ -79,7 +79,6 @@ def scan_port(ip, port, open_ports):
 			open_ports.append(port)
 	except (socket.timeout, socket.error, ConnectionRefusedError):
 		pass
-
 
 # scan multiple ports
 def scan_ports(ip, ports):
@@ -163,6 +162,9 @@ def main():
 
 	try:
 		ports = parse_port(args.port)
+		if len(ports) == 1 and int(ports[0]) > 65535:
+			print(f"[{filename.split('.')[0]}] port must be 0-65535")
+			exit(2)
 	except ValueError:
 		print(f"[info] invalid port '{args.port}'")
 		exit(2)
