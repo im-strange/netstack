@@ -1,15 +1,29 @@
 
-from datetime import datetime
-from tqdm import tqdm
-import configparser
-import threading
-import argparse
-import requests
-import time
-import sys
-import os
+try:
+	from datetime import datetime
+	from tqdm import tqdm
+	import configparser
+	import threading
+	import argparse
+	import requests
+	import time
+	import sys
+	import os
 
+except ModuleNotFoundError as e:
+	print(f"[main] {e}")
+	exit(2)
 
+# colors
+RED = '\033[31m'
+GREEN = '\033[32m'
+YELLOW = '\033[33m'
+BLUE = '\033[34m'
+MAGENTA = '\033[35m'
+GRAY = '\033[90m'
+RESET = '\033[0m'
+
+# get current time
 def get_time():
 	current_time = datetime.now().strftime('%m-%d-%Y %I:%M:%S%p')
 	return current_time
@@ -21,6 +35,7 @@ class Scanner:
 		self.lock = threading.Lock()
 		self.results_lock = threading.Lock()
 
+		# open config file
 		self.config = configparser.ConfigParser()
 		self.config.read(config_file)
 
@@ -33,24 +48,31 @@ class Scanner:
 		self.output_file = self.config.get("settings", "output_file")
 		self.timeout = (self.connection_timeout, self.read_timeout)
 		self.status_codes = [int(code.strip()) for code in self.config.get("settings", "status_codes").split(',')]
+		self.sleep_time = float(self.config.get("settings", "sleep_time"))
 		self.counter = 0
 
 	# display settings
 	def display_settings(self):
-		print(f"\n[{get_time()}] scan started")
-		print(f"{' '*4}* target_url   : {self.url}")
-		print(f"{' '*4}* wordlist     : {self.wordlist}")
-		print(f"{' '*4}* status_codes : {self.status_codes}")
-		print(f"{' '*4}* verbose      : {self.verbose}")
-		print(f"{' '*4}* thread       : {self.thread_count}")
+		print(f"\n{GRAY}[{YELLOW}{get_time()}{GRAY}]{RESET} scan started")
+		print(f"{' '*4}[+] status_codes : {','.join(str(num) for num in self.status_codes)}")
+		print(f"{' '*4}[+] target_url   : {self.url}")
+		print(f"{' '*4}[+] wordlist     : {self.wordlist}")
+		print(f"{' '*4}[+] verbose      : {self.verbose}")
+		print(f"{' '*4}[+] thread       : {self.thread_count}")
+		print(f"{' '*4}[+] output       : {self.output_file}")
+		print(f"{' '*4}[+] sleep_time   : {self.sleep_time}")
 		print()
 
 	# thread worker
 	def thread_worker(self, payloads, results):
 		for payload in payloads:
 			self.make_request(payload, results)
+
 			with self.lock:
 				self.counter += 1
+
+			#  wait before sending another request
+			time.sleep(self.sleep_time)
 
 	# main scan function
 	def scan(self):
@@ -84,9 +106,9 @@ class Scanner:
 		while any(thread.is_alive() for thread in threads):
 			with self.lock:
 				progress = round((self.counter / total_lines) * 100, 2)
-				print(f"\r\033[K[{self.name}] {progress}%", end="\r")
+				print(f"\r\033[K{GRAY}[{YELLOW}{self.counter}/{len(wordlist)}{GRAY}]{RESET} scanning {progress}%", end="\r")
 
-		print()
+		print(f"\r\033[K{GRAY}[{YELLOW}{get_time()}{GRAY}]{RESET} Finished")
 
 		# join threads
 		for thread in threads:
@@ -105,7 +127,7 @@ class Scanner:
 			if response.status_code in self.status_codes:
 				with self.results_lock:
 					results.append((get_time(), url, response.status_code))
-				print(f"\r\r\r\r\r[{response.status_code}] {url}")
+				print(f"\r\r\r\r\r{GRAY}[{GREEN}{response.status_code}{GRAY}] {BLUE}{url}{RESET}")
 
 		except requests.exceptions.Timeout:
 			if self.verbose:
@@ -128,29 +150,16 @@ class Scanner:
 			print()
 			print(f"\r\033[K[{self.name}] no directory found from '{self.wordlist}' to target site")
 
-http_responses = [
-    {"code": 200, "message": "OK"},
-    {"code": 301, "message": "Moved Permanently"},
-    {"code": 302, "message": "Found"},
-    {"code": 403, "message": "Forbidden"},
-    {"code": 404, "message": "Not Found"},
-    {"code": 500, "message": "Internal Server Error"},
-    {"code": 502, "message": "Bad Gateway"},
-    {"code": 503, "message": "Service Unavailable"},
-    {"code": 401, "message": "Unauthorized"},
-    {"code": 429, "message": "Too Many Requests"},
-    {"code": 418, "message": "I'm a teapot"},
-    {"code": 307, "message": "Temporary Redirect"},
-    {"code": 308, "message": "Permanent Redirect"}
-]
 
-
+# typewrite animation
 def type(words, speed=0.005):
 	for letter in words:
 		print(letter, end="", flush=True)
 		time.sleep(speed)
 	print()
 
+
+# main function to call
 def main():
 	# get the name and basename
 	filename = os.path.basename(__file__)
@@ -165,9 +174,15 @@ def main():
 				f"\npositional arguments:",
 				f"{' '*tabsize}{'-w, --wordlist':<15} wordlist path [default=dir_list/list1.txt]",
 				f"{' '*tabsize}{'-u, --url':<15} target url",
+				f"\noptional arguments:",
 				f"{' '*tabsize}{'-s, --status':<15} target status code",
+				f"{' '*tabsize}{'-t, --threads':<15} thread count [default=5]",
+				f"{' '*tabsize}{'-o, --output':<15} output file [default=results.txt]",
+				f"{' '*tabsize}{'--sleep':<15} delay before next request [default=0.2]",
 				f"\nexamples:",
-				f"{' '*tabsize}python {filename} -u https://example.com -w mywordlist.txt"
+				f"{' '*tabsize}python {filename} -u https://example.com -w mywordlist.txt",
+				f"{' '*tabsize}python {filename} -u http://localhost:5000/ -t 1 -s 200,201,202,203",
+				f"{' '*tabsize}python {filename} -u https://example.com -o output.txt"
 			]
 			for line in lines:
 				print(line)
@@ -175,6 +190,7 @@ def main():
 
 		def error(self, message):
 			type(f"[{basename}] {message}")
+			type(f"[{basename}] see '--help' for more info")
 			exit(2)
 
 	# add arguments
@@ -184,6 +200,8 @@ def main():
 	parser.add_argument("-s", "--status")
 	parser.add_argument("-t", "--threads", type=int)
 	parser.add_argument("-o", "--output")
+	parser.add_argument("--sleep", type=float)
+	parser.add_argument("--verbose", action="store_true")
 
 	# get the given arguments
 	args = parser.parse_args()
@@ -204,6 +222,8 @@ def main():
 
 	if args.threads: scanner.thread_count = args.threads
 	if args.output: scanner.output_file = args.output
+	if args.sleep: scanner.sleep_time = args.sleep
+	if args.verbose: scanner.verbose = True
 
 	scanner.display_settings()
 	scanner.scan()
